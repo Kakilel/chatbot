@@ -55,10 +55,11 @@ def send_to_session(session,user_message):
         model_name='gemini-2.5-flash',
         generation_config=genai.GenerationConfig(
             temperature=0.5,
-            max_output_tokens=568
+            max_output_tokens=2500
         )
     )
     chat = model.start_chat()
+    
     timestamp = datetime.datetime.now().isoformat(timespec='seconds')
 
     try:
