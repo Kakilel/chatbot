@@ -15,7 +15,9 @@ if os.path.exists(LOG_FILE):
             day_log = json.load(f)
         except json.JSONDecodeError:
             print("Warning: chat_log.json is corrupted. Starting fresh.")
+            day_log = []
 else:
+    day_log=[]
     with open(LOG_FILE, 'w', encoding='utf-8') as f:
         json.dump([], f)
 
@@ -25,8 +27,10 @@ def show_menu():
     print('1. View all session IDs')
     print('2. View session messages')
     print('3. Start new chat session')
-    print('4. Exit')
-    return input('Choose an option (1-4): ').strip()
+    print('4. Continue session')
+    print('5. Delete session')
+    print('6. Exit')
+    return input('Choose an option (1-6): ').strip()
 
 def sessions():
     if not day_log:
@@ -34,6 +38,7 @@ def sessions():
         return
     print(f'\n --- Sessions for {today_str} ---')
     for i, session in enumerate(day_log, 1):
+        name = session.get('name','Unnamed')
         print(f'{i}. Session ID: {session["session_id"]}')
     print('-----------------------')
 
@@ -52,11 +57,53 @@ def view_session_messages():
     except (ValueError, IndexError):
         print('Invalid selection.\n')
 
+def continue_session():
+    if not day_log:
+        print("No sessions to continue.\n")
+        return
+    sessions()
+    try:
+        idx = int(input("Enter the session number to continue: ").strip()) - 1
+        session = day_log[idx]
+        chat_loop(session)
+    except (ValueError, IndexError):
+        print("Invalid selection.\n")
+
+
+def delete_session():
+    if not day_log:
+        print("No sessions available to delete.\n")
+        return
+
+    print("Available sessions:")
+    for idx, session in enumerate(day_log, start=1):
+        print(f"{idx}. {session.get('name','Unnamed')}(ID:{session['session_id']})")
+
+    try:
+        choice = int(input("Enter the number of the session to delete: ").strip())
+        if 1 <= choice <= len(day_log):
+            session = day_log[choice - 1]
+            confirm = input(f"Are you sure you want to delete session '{session}'? (yes/no): ").strip().lower()
+            if confirm == 'yes':
+                del day_log[choice - 1]
+                save_log()
+                print(f"Session {session} deleted.\n")
+            else:
+                print("Deletion cancelled.\n")
+        else:
+            print("Invalid selection.\n")
+    except ValueError:
+        print("Invalid input. Please enter a number.\n")
+
+
 def save_log():
     with open(LOG_FILE, 'w', encoding='utf-8') as f:
         json.dump(day_log, f, indent=4, ensure_ascii=False)
 
 def start_new_session():
+    session_name = input("Enter a name for this session (e.g. 'Weather Chat'): ").strip()
+    if not session_name:
+        session_name = 'Untitled Session'
     session_id = datetime.datetime.now().isoformat(timespec='seconds')
     new_session = {
         'session_id': session_id,
@@ -64,7 +111,8 @@ def start_new_session():
     }
     day_log.append(new_session)
     save_log()
-
+    return new_session
+def chat_loop(session):
     model = genai.GenerativeModel(
         model_name='gemini-2.5-flash',
         generation_config=genai.GenerationConfig(
@@ -74,7 +122,7 @@ def start_new_session():
     )
 
     chat = model.start_chat()
-    print(f"\n--- New Chat Session Started: {session_id} ---")
+    print(f"\n--- New Chat Session Started: {session['session_id']} ---")
     print("Type 'exit' to end session.\n")
 
     while True:
@@ -101,7 +149,7 @@ def start_new_session():
                 bot_reply = response.text.strip()
                 print("Bot:", bot_reply)
 
-                new_session['messages'].append({
+                session['messages'].append({
                     'timestamp': datetime.datetime.now().isoformat(),
                     'user_message': user,
                     'bot_response': bot_reply
@@ -125,6 +173,10 @@ while True:
     elif choice == '3':
         start_new_session()
     elif choice == '4':
+        continue_session()    
+    elif choice == '5':
+        delete_session()    
+    elif choice == '6':
         print("Goodbye!")
         break
     else:
