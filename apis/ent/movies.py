@@ -22,9 +22,8 @@ def make_request(endpoint: str, params: dict = {}):
         logging.error(f"Request exception: {e}")
     return None
 
-# Natural Language Routing (Expanded with more expressions)
 
-def route_query(query: str):
+def route_movie_query(query: str):
     if not query:
         return None
 
@@ -98,7 +97,6 @@ def route_query(query: str):
 
 
 
-# 1. Search
 
 def search_movie(query: str):
     if not query:
@@ -120,7 +118,6 @@ def search_multi(query: str):
         return None
     return make_request("/search/multi", {"query": query})
 
-# 2. Trending & Popular
 
 def trending_movies(period: str = "week"):
     if period not in ["day", "week"]:
@@ -148,7 +145,6 @@ def top_rated_tv():
 def airing_today():
     return make_request("/tv/airing_today")
 
-# 3. Details
 
 def movie_details(movie_id: int):
     if not movie_id:
@@ -195,7 +191,6 @@ def movie_external_ids(movie_id: int):
         return None
     return make_request(f"/movie/{movie_id}/external_ids")
 
-# 4. People
 
 def person_details(person_id: int):
     if not person_id:
@@ -215,7 +210,6 @@ def person_tv_credits(person_id: int):
 def popular_people():
     return make_request("/person/popular")
 
-# 5. Genres & Discovery
 
 def genre_movie_list():
     return make_request("/genre/movie/list")
@@ -229,7 +223,6 @@ def discover_movies(filters: dict = {}):
 def discover_tv(filters: dict = {}):
     return make_request("/discover/tv", filters)
 
-# 6. Watch Providers
 
 def watch_providers():
     return make_request("/watch/providers/movie")
@@ -244,7 +237,6 @@ def tv_watch_providers(tv_id: int):
         return None
     return make_request(f"/tv/{tv_id}/watch/providers")
 
-# 7. Images & Videos
 
 def movie_images(movie_id: int):
     if not movie_id:
@@ -266,7 +258,32 @@ def tv_videos(tv_id: int):
         return None
     return make_request(f"/tv/{tv_id}/videos")
 
-# 8. Config
+
 
 def tmdb_configuration():
     return make_request("/configuration")
+
+
+def format_movie_response(data):
+    if not data:
+        return "No movie information found."
+
+    if 'results' in data:
+        results = data['results']
+        if not results:
+            return "No results found."
+        summary = []
+        for item in results[:5]:
+            title = item.get("title") or item.get("name")
+            overview = item.get("overview", "No description available.")
+            release = item.get("release_date") or item.get("first_air_date", "N/A")
+            summary.append(f"🎬 {title} ({release})\n{overview[:180]}...")
+        return "\n\n".join(summary)
+
+    if 'title' in data or 'name' in data:
+        title = data.get("title") or data.get("name")
+        overview = data.get("overview", "No description available.")
+        release = data.get("release_date") or data.get("first_air_date", "N/A")
+        return f"🎬 {title} ({release})\n{overview}"
+
+    return str(data)

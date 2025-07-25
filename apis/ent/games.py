@@ -21,32 +21,26 @@ def make_request(endpoint: str, params: dict = {}):
         logging.error(f"Request exception: {e}")
     return None
 
-# --- SEARCH ---
 
 def search_game(query: str):
     return make_request("/games", {"search": query})
 
-# --- DETAILS ---
 
 def game_details(game_slug: str):
     return make_request(f"/games/{game_slug}")
 
-# --- SCREENSHOTS ---
 
 def game_screenshots(game_slug: str):
     return make_request(f"/games/{game_slug}/screenshots")
 
-# --- TRAILERS ---
 
 def game_trailers(game_slug: str):
     return make_request(f"/games/{game_slug}/movies")
 
-# --- SIMILAR GAMES ---
 
 def game_suggestions(game_slug: str):
     return make_request(f"/games/{game_slug}/suggested")
 
-# --- NATURAL LANGUAGE ROUTING ---
 
 def route_game_query(query: str):
     if not query:
@@ -78,3 +72,15 @@ def route_game_query(query: str):
         return search_game(match.group(1))
 
     return search_game(query)
+
+def format_game_response(data):
+    if not data or "name" not in data:
+        return "No game info found."
+
+    name = data.get("name", "Unknown Title")
+    description = data.get("description_raw", "No description available.")
+    website = data.get("website", "")
+    released = data.get("released", "Unknown")
+
+    return f"**{name}** (Released: {released})\n\n{description}\n\n{website if website else ''}"
+

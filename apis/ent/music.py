@@ -25,37 +25,30 @@ def make_request(method: str, params: dict):
         logging.error(f"Request exception: {e}")
     return None
 
-# --- ARTIST INFO ---
 
 def artist_info(name: str):
     return make_request("artist.getinfo", {"artist": name})
 
-# --- TOP TRACKS ---
 
 def artist_top_tracks(name: str):
     return make_request("artist.gettoptracks", {"artist": name})
 
-# --- SIMILAR ARTISTS ---
 
 def similar_artists(name: str):
     return make_request("artist.getsimilar", {"artist": name})
 
-# --- ALBUM INFO ---
 
 def album_info(artist: str, album: str):
     return make_request("album.getinfo", {"artist": artist, "album": album})
 
-# --- SEARCH ARTIST ---
 
 def search_artist(name: str):
     return make_request("artist.search", {"artist": name})
 
-# --- SEARCH TRACK ---
 
 def search_track(name: str):
     return make_request("track.search", {"track": name})
 
-# --- NATURAL PHRASE ROUTER ---
 
 def route_music_query(query: str):
     query = query.lower()
@@ -79,3 +72,39 @@ def route_music_query(query: str):
         return search_track(match.group(1))
 
     return search_artist(query)
+
+def format_music_response(data):
+    if not data:
+        return "No music information found."
+
+    if "artist" in data:
+        artist = data["artist"]
+        bio = artist.get("bio", {}).get("summary", "")
+        tags = [t["name"] for t in artist.get("tags", {}).get("tag", [])]
+        return f"{artist.get('name')}\nTags: {', '.join(tags)}\n\nBio: {bio[:300]}..."
+
+    if "toptracks" in data:
+        tracks = data["toptracks"].get("track", [])
+        if not tracks:
+            return "No top tracks found."
+        return "\n".join([f"{t['name']} ({t['playcount']} plays)" for t in tracks[:5]])
+
+    if "similarartists" in data:
+        artists = data["similarartists"].get("artist", [])
+        return "Similar Artists:\n" + ", ".join([a["name"] for a in artists[:5]])
+
+    if "album" in data:
+        album = data["album"]
+        tracks = album.get("tracks", {}).get("track", [])
+        track_list = "\n".join([f"🎶 {t['name']}" for t in tracks[:5]]) if isinstance(tracks, list) else "No tracks found"
+        return f"{album.get('name')} by {album.get('artist')}\nTracks:\n{track_list}"
+
+    if "results" in data:
+        matches = data["results"].get("artistmatches", {}).get("artist", []) or \
+                  data["results"].get("trackmatches", {}).get("track", [])
+        if not matches:
+            return "No search results found."
+        return "\n".join([f"🎵 {m['name']} - {m.get('artist', '')}" for m in matches[:5]])
+
+    return str(data)
+

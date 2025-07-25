@@ -2,7 +2,7 @@ import requests
 import html
 import random
 import time
-
+import re
 
 CATEGORIES = {
     "general": 9,
@@ -15,20 +15,18 @@ CATEGORIES = {
     "animals": 27,
 }
 
-start_time =None
-timeout_seconds=15
+start_time = None
+timeout_seconds = 15
 
-
-def get_trivia_question(category=None,difficulty='medium',qtype='multiple'):
+def get_trivia_question(category=None, difficulty='medium', qtype='multiple'):
     global start_time
 
-    category_id = CATEGORIES.get(category.lower()) if category else None    
+    category_id = CATEGORIES.get(category.lower()) if category else None
     url = f"https://opentdb.com/api.php?amount=1&type={qtype}"
     if category_id:
         url += f'&category={category_id}'
     if difficulty:
         url += f'&difficulty={difficulty}'
-
 
     try:
         response = requests.get(url)
@@ -43,17 +41,44 @@ def get_trivia_question(category=None,difficulty='medium',qtype='multiple'):
             options = incorrect + [correct]
             random.shuffle(options)
 
+            start_time = time.time()
 
-            start_time=time.time()
-
-
-            return{
+            return {
                 'question': question,
-                'options' : options,
-                'answer' : correct,
+                'options': options,
+                'answer': correct,
                 'type': result['type']
             }
         else:
             return {"question": "Error fetching trivia", "options": [], "answer": ""}
     except Exception as e:
-        return {"question": "Trivia error", "options": [], "answer": str(e)}    
+        return {"question": "Trivia error", "options": [], "answer": str(e)}
+
+def format_trivia(trivia_data):
+    q = trivia_data.get("question", "No question")
+    options = trivia_data.get("options", [])
+    if not options:
+        return "Could not load options."
+
+    labels = ['A', 'B', 'C', 'D']
+    msg = f" **Trivia Time!**\n\n**Q:** {q}\n"
+    for i, opt in enumerate(options):
+        msg += f"{labels[i]}. {opt}\n"
+
+    msg += "\n_Reply with A, B, C, or D to answer._"
+    return msg
+
+
+
+def route_trivia_query(query: str):
+    query = query.lower()
+
+    if match := re.search(r"(trivia|quiz|question)", query):
+        cat = None
+        for c in CATEGORIES:
+            if c in query:
+                cat = c
+                break
+        return get_trivia_question(category=cat)
+
+    return None

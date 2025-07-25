@@ -1,4 +1,5 @@
 import requests
+import re
 
 TRANSLATE_URL = "https://libretranslate.com/translate"
 DETECT_URL = "https://libretranslate.com/detect"
@@ -44,6 +45,34 @@ def translate_text(text: str, target: str = "en", source: str = None) -> str:
         }
         response = requests.post(TRANSLATE_URL, json=payload, timeout=10)
         response.raise_for_status()
-        return response.json().get("translatedText", "Translation not available")
+        translated = response.json().get("translatedText", "")
+        return f"**Translated ({source} → {target})**:\n{translated}"
     except:
         return "Error: Translation failed."
+
+def format_detect_result(text: str):
+    lang = detect_language(text)
+    return f"**Detected language**: {lang}"
+
+def route_translation_query(text: str):
+   
+    if "detect language of" in text or "what language is" in text:
+        match = re.search(r"(?:detect language of|what language is) (.+)", text)
+        if match:
+            return format_detect_result(match.group(1))
+
+    match = re.search(r"translate (.+) from (\w+) to (\w+)", text)
+    if match:
+        phrase, source, target = match.groups()
+        return translate_text(phrase, target=target, source=source)
+
+    match = re.search(r"translate (.+) to (\w+)", text)
+    if match:
+        phrase, target = match.groups()
+        return translate_text(phrase, target=target)
+
+    match = re.search(r"translate (.+)", text)
+    if match:
+        return translate_text(match.group(1))
+
+    return None

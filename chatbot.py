@@ -8,7 +8,7 @@ from PyQt6.QtGui import QTextOption
 import qtawesome as qta
 import markdown
 import sys
-import api
+import gemini
 
 class ChatBubble(QTextBrowser):
     def __init__(self, text, is_user):
@@ -141,13 +141,13 @@ class ChatHome(QWidget):
 
     def refresh_session_list(self):
         self.session_list.clear()
-        for session in api.get_sessions():
+        for session in gemini.get_sessions():
             self.session_list.addItem(session['name'])
 
     def new_session(self):
         name, ok = QInputDialog.getText(self, "New Session", "Enter a name:")
         if ok and name:
-            self.session = api.start_session(name)
+            self.session = gemini.start_session(name)
             self.clear_chat()
             self.refresh_session_list()
 
@@ -157,7 +157,7 @@ class ChatHome(QWidget):
             QMessageBox.warning(self, "Error", "Select a session first.")
             return
         name = selected.text()
-        session_data = api.get_session_by_name(name)
+        session_data = gemini.get_session_by_name(name)
         if not session_data:
             QMessageBox.warning(self, "Error", f"Session '{name}' not found.")
             return
@@ -172,7 +172,7 @@ class ChatHome(QWidget):
         name = selected.text()
         confirm = QMessageBox.question(self, "Confirm", f"Delete session '{name}'?")
         if confirm == QMessageBox.StandardButton.Yes:
-            api.delete_session_by_name(name)
+            gemini.delete_session_by_name(name)
             self.clear_chat()
             self.refresh_session_list()
 
@@ -222,7 +222,7 @@ class ChatHome(QWidget):
         QTimer.singleShot(1000, lambda: self.fake_typing(user_text))
 
     def fake_typing(self, user_text):
-        response = api.send_to_session(self.session, user_text)
+        response = gemini.send_to_session(self.session, user_text)
         self.typing_label.hide()
         self.add_chat_bubble(response, is_user=False)
 

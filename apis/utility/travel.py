@@ -21,7 +21,6 @@ def make_request(endpoint: str, params: dict):
         logging.error(f"Request exception: {e}")
     return None
 
-# --- COORDINATES ---
 def get_coords(city: str):
     url = "https://nominatim.openstreetmap.org/search"
     params = {"q": city, "format": "json"}
@@ -35,7 +34,6 @@ def get_coords(city: str):
         logging.error(f"Geolocation error: {e}")
     return None, None
 
-# --- PLACES NEARBY ---
 def nearby_places(city: str, radius_km: int = 5, limit: int = 10):
     lat, lon = get_coords(city)
     if lat is None or lon is None:
@@ -49,21 +47,56 @@ def nearby_places(city: str, radius_km: int = 5, limit: int = 10):
         "format": "json"
     })
 
-# --- PLACE DETAILS ---
 def place_details(xid: str):
     return make_request(f"/xid/{xid}", {})
 
-# --- NATURAL PHRASE ROUTING ---
+
+def format_place_list(places: list, city: str):
+    if not places:
+        return f"No popular places found in {city}."
+
+    results = [f"**Top Attractions in {city.capitalize()}:**\n"]
+    for place in places:
+        name = place.get("name", "Unnamed")
+        kinds = place.get("kinds", "").replace("_", " ").title()
+        xid = place.get("xid")
+        url = f"https://opentripmap.com/en/card/{xid}" if xid else ""
+        line = f"- **{name}**"
+        if kinds:
+            line += f" ({kinds})"
+        if url:
+            line += f" — [Details]({url})"
+        results.append(line)
+
+    return "\n".join(results[:10])
+
+
 def route_tourist_query(query: str):
     query = query.lower()
 
     if match := re.search(r"(what are|show) (some )?(attractions|places|things to do) in (.+)", query):
-        return nearby_places(match.group(4))
+        city = match.group(4)
+        places = nearby_places(city)
+        if isinstance(places, dict) and "error" in places:
+            return places["error"]
+        return format_place_list(places, city)
 
     if match := re.search(r"places near (.+)", query):
-        return nearby_places(match.group(1))
+        city = match.group(1)
+        places = nearby_places(city)
+        if isinstance(places, dict) and "error" in places:
+            return places["error"]
+        return format_place_list(places, city)
 
     if match := re.search(r"tourist spots in (.+)", query):
-        return nearby_places(match.group(1))
+        city = match.group(1)
+        places = nearby_places(city)
+        if isinstance(places, dict) and "error" in places:
+            return places["error"]
+        return format_place_list(places, city)
 
-    return nearby_places(query)
+    places = nearby_places(query)
+    if isinstance(places, dict) and "error" in places:
+        return places["error"]
+    return format_place_list(places, query)
+

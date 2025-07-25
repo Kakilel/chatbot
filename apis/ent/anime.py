@@ -18,7 +18,6 @@ def make_request(endpoint: str, params: dict = {}):
         logging.error(f"Request exception: {e}")
     return None
 
-# --- SEARCH ---
 
 def search_anime(query: str):
     return make_request("/anime", {"q": query})
@@ -32,7 +31,6 @@ def search_character(query: str):
 def search_person(query: str):
     return make_request("/people", {"q": query})
 
-# --- DETAILS ---
 
 def anime_details(anime_id: int):
     return make_request(f"/anime/{anime_id}/full")
@@ -46,7 +44,6 @@ def character_details(character_id: int):
 def person_details(person_id: int):
     return make_request(f"/people/{person_id}/full")
 
-# --- AIRING / SCHEDULE ---
 
 def todays_schedule():
     return make_request("/schedules")
@@ -54,7 +51,6 @@ def todays_schedule():
 def schedule_by_day(day: str):
     return make_request(f"/schedules/{day.lower()}")
 
-# --- RANKINGS ---
 
 def top_anime(type_filter="airing", limit=10):
     return make_request("/top/anime", {"type": type_filter, "limit": limit})
@@ -62,7 +58,6 @@ def top_anime(type_filter="airing", limit=10):
 def top_manga(type_filter="manga", limit=10):
     return make_request("/top/manga", {"type": type_filter, "limit": limit})
 
-# --- SEASONAL ---
 
 def current_season():
     return make_request("/seasons/now")
@@ -73,7 +68,6 @@ def upcoming_season():
 def seasonal_anime(year: int, season: str):
     return make_request(f"/seasons/{year}/{season.lower()}")
 
-# --- RECOMMENDATIONS ---
 
 def anime_recommendations(anime_id: int):
     return make_request(f"/anime/{anime_id}/recommendations")
@@ -81,12 +75,10 @@ def anime_recommendations(anime_id: int):
 def manga_recommendations(manga_id: int):
     return make_request(f"/manga/{manga_id}/recommendations")
 
-# --- EPISODES ---
 
 def anime_episodes(anime_id: int):
     return make_request(f"/anime/{anime_id}/episodes")
 
-# --- NATURAL LANGUAGE ROUTING ---
 
 def route_anime_query(query: str):
     if not query:
@@ -123,3 +115,22 @@ def route_anime_query(query: str):
     if "upcoming anime" in query:
         return upcoming_season()
     return search_anime(query)
+
+
+def format_anime_response(data):
+    if not data or "data" not in data:
+        return "No anime information found."
+
+    d = data["data"]
+
+    if isinstance(d, list):
+        entries = d[:5]
+        return "\n\n".join([
+            f"**{entry.get('title', 'Unknown')}**\nScore: {entry.get('score', 'N/A')}\nEpisodes: {entry.get('episodes', '?')}\n{entry.get('synopsis', '')[:200]}..."
+            for entry in entries
+        ])
+    elif isinstance(d, dict):
+        entry = d
+        return f"**{entry.get('title', 'Unknown')}**\nScore: {entry.get('score', 'N/A')}\nEpisodes: {entry.get('episodes', '?')}\n{entry.get('synopsis', '')}"
+    else:
+        return str(d)

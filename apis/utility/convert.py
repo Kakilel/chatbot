@@ -1,4 +1,5 @@
 import math
+import re
 
 class UnitConverter:
     def __init__(self):
@@ -77,9 +78,9 @@ class UnitConverter:
                 "kb": 1000, "mb": 1e6, "gb": 1e9, "tb": 1e12,
             },
             "currency": {
-                "usd": 1.0,          # Base USD
-                "eur": 0.92,         # Example rate
-                "kes": 145.0,        # Kenyan Shilling (example)
+                "usd": 1.0,         
+                "eur": 0.92,         
+                "kes": 145.0,        
                 "gbp": 0.78,
                 "jpy": 140.0,
                 "inr": 83.0,
@@ -120,7 +121,6 @@ class UnitConverter:
                 return (amount - 273.15) * 9 / 5 + 32
         raise ValueError(f"Invalid temperature conversion: {from_unit} to {to_unit}")
 
-# Example usage and CLI:
 if __name__ == "__main__":
     converter = UnitConverter()
     examples = [
@@ -142,7 +142,6 @@ if __name__ == "__main__":
         except Exception as e:
             print(f"Error converting {amount} {from_u} to {to_u}: {e}")
 
-    # Interactive mode (optional)
     while True:
         print("\nType 'exit' to quit.")
         amt_input = input("Enter amount: ")
@@ -161,3 +160,22 @@ if __name__ == "__main__":
             print(f"{amt} {from_unit} = {converted:.4f} {to_unit}")
         except Exception as ex:
             print("Error:", ex)
+def format_unit_conversion(amount, from_unit, to_unit, result):
+    return f"{amount} {from_unit} = {result:.4f} {to_unit}"
+
+
+
+def route_unit_query(text: str):
+    pattern = r"(?:convert|change|how many|what(?:'s| is) the) (\d+(?:\.\d+)?)\s*(\w+)\s*(?:to|in|into)\s*(\w+)"
+    match = re.search(pattern, text.lower())
+    if match:
+        try:
+            amount = float(match.group(1))
+            from_unit = match.group(2)
+            to_unit = match.group(3)
+            converter = UnitConverter()
+            result = converter.convert(amount, from_unit, to_unit)
+            return format_unit_conversion(amount, from_unit, to_unit, result)
+        except Exception as e:
+            return f"Error converting units: {str(e)}"
+    return None

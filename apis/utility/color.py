@@ -81,6 +81,9 @@ def get_named_colors():
 
 def route_color_query(text: str):
     text = text.lower()
+    if match := re.search(r"(what color is|info on|details about)\s*(#[0-9a-fA-F]{6}|rgb\([^)]+\)|[a-zA-Z]+)", text):
+        return get_color_info(match.group(2))
+
 
     if "random color" in text:
         return generate_random_colors()
@@ -100,3 +103,26 @@ def route_color_query(text: str):
         return get_named_colors()
 
     return {"error": "No valid color-related input found."}
+
+def format_color_response(data):
+    if "error" in data:
+        return f"Error: {data['error']}"
+
+    if data["type"] == "info":
+        return (
+            f"Color Info: *{data['name']}*\n"
+            f"HEX: `{data['hex']}`\n"
+            f"RGB: `{data['rgb']}`\n"
+            f"HSL: `{data['hsl']}`\n"
+            f"Contrast: {data['contrast']}\n"
+            f"[Color Preview]({data['image']})"
+        )
+
+    elif data["type"] in ["scheme", "random"]:
+        hexes = "\n".join(f"• `{color}`" for color in data["colors"])
+        return (
+            f"Color Scheme ({data['mode'].capitalize()}):\n{hexes}\n"
+            f"[Preview Image]({data['image']})"
+        )
+
+    return "Unknown color data format."

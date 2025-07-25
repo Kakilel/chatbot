@@ -25,8 +25,28 @@ def get_bible_verse(reference: str):
         return {"error": "Could not fetch verse."}
 
 def route_bible_query(text: str):
-    text = text.lower()
-    match = re.search(r"(?:bible|verse|scripture)(?: for)? (.+)", text)
-    if match:
-        return get_bible_verse(match.group(1))
+    text = text.lower().strip()
+
+    patterns = [
+        r"(?:bible|verse|scripture)(?: for| from)? (.+)",     
+        r"(john \d+:\d+)",                                   
+        r"(psalm \d+)",                                       
+        r"(genesis \d+:\d+)"                                  
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, text)
+        if match:
+            return get_bible_verse(match.group(1))
+
     return get_bible_verse(text)
+
+
+def format_bible_response(data):
+    if "error" in data:
+        return f"Error: {data['error']}"
+    return (
+        f"{data['reference']}\n"
+        f"{data['text'].strip()}\n\n"
+        f"_({data['translation']})_"
+    )
