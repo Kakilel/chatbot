@@ -1,30 +1,66 @@
+import sys
+import markdown
+import datetime
+import qtawesome as qta
+import google.generativeai as genai
+
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout,
-    QPushButton, QListWidget, QLineEdit,
-    QMessageBox, QInputDialog, QLabel, QScrollArea, QFrame, QTextBrowser
+    QPushButton, QListWidget, QLineEdit, QLabel,
+    QMessageBox, QInputDialog, QScrollArea, QFrame, QTextBrowser
 )
 from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve
 from PyQt6.QtGui import QTextOption
-import qtawesome as qta
-import markdown
-import sys
-import gemini
+
+from all_apis import route_all_apis
+
+# Configure Gemini
+genai.configure(api_key="AIzaSyCM10Ct_FKnlz37MRazEhEOEDkjywU8_cQ")
+model = genai.GenerativeModel(
+    model_name="gemini-2.5-flash",
+    generation_config=genai.GenerationConfig(temperature=0.5, max_output_tokens=2500)
+)
+
+_sessions = []
+
+def get_sessions():
+    return _sessions
+
+def start_session(name):
+    session = {
+        "name": name,
+        "messages": [],
+        "chat": model.start_chat()
+    }
+    _sessions.append(session)
+    return session
+
+def get_session_by_name(name):
+    for session in _sessions:
+        if session["name"] == name:
+            return session
+    return None
+
+def delete_session_by_name(name):
+    global _sessions
+    _sessions = [s for s in _sessions if s["name"] != name]
 
 class ChatBubble(QTextBrowser):
     def __init__(self, text, is_user):
         super().__init__()
         self.setOpenExternalLinks(True)
-        self.setOpenLinks(True)
         self.setReadOnly(True)
         self.setWordWrapMode(QTextOption.WrapMode.WordWrap)
         self.setFrameShape(QFrame.Shape.NoFrame)
-        self.setMaximumWidth(400)
+        self.setMaximumWidth(600)
+
         self.setStyleSheet(f'''
             QTextBrowser {{
-                background-color: {'#3D5A80' if is_user else '#98C1D9'};
-                color: {'#ffffff' if is_user else '#000000'};
-                border-radius: 15px;
+                background-color: {'#3f3f46' if is_user else '#27272a'};
+                color: {'#f4f4f5' if is_user else '#e4e4e7'};
+                border-radius: 12px;
                 padding: 8px 12px;
+                font-size: 14px;
             }}
         ''')
 
@@ -33,11 +69,9 @@ class ChatBubble(QTextBrowser):
         self.adjustSize()
         self.setMinimumHeight(int(self.document().size().height()) + 10)
 
-        # Animation
-        self.setGraphicsEffect(None)
         self.setWindowOpacity(0.0)
         self.anim = QPropertyAnimation(self, b"windowOpacity")
-        self.anim.setDuration(300)
+        self.anim.setDuration(250)
         self.anim.setStartValue(0.0)
         self.anim.setEndValue(1.0)
         self.anim.setEasingCurve(QEasingCurve.Type.InOutQuad)
@@ -46,13 +80,13 @@ class ChatBubble(QTextBrowser):
 class ChatHome(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Fred (PyQt6)")
-        self.resize(950, 620)
+        self.setWindowTitle("Fred")
+        self.resize(1000, 640)
         self.session = None
-        self.typing_timer = None
-        self.typing_label = QLabel("Bot is typing...")
-        self.typing_label.setStyleSheet("color: #cccccc; font-style: italic;")
+        self.typing_label = QLabel("Fred is typing...")
+        self.typing_label.setStyleSheet("color: #a1a1aa; font-style: italic;")
         self.typing_label.hide()
+        self.is_dark_mode = True
         self.init_ui()
         self.set_styles()
 
@@ -60,10 +94,21 @@ class ChatHome(QWidget):
         main_layout = QHBoxLayout()
         self.setLayout(main_layout)
 
-        # Sidebar
         left_layout = QVBoxLayout()
         self.session_list = QListWidget()
-        left_layout.addWidget(QLabel("\U0001F4D1 Sessions"))
+        icon_label = QLabel()
+        icon_label.setPixmap(qta.icon("fa5s.history").pixmap(16, 16))
+        text_label = QLabel("  Sessions")
+
+        row_layout = QHBoxLayout()
+        row_layout.addWidget(icon_label)
+        row_layout.addWidget(text_label)
+        row_layout.addStretch()
+
+        row_widget = QWidget()
+        row_widget.setLayout(row_layout)
+
+        left_layout.addWidget(row_widget)
         left_layout.addWidget(self.session_list)
 
         btn_new = QPushButton(qta.icon('fa5s.plus'), "  New")
@@ -73,13 +118,14 @@ class ChatHome(QWidget):
         btn_delete = QPushButton(qta.icon('fa5s.trash'), "  Delete")
         btn_delete.clicked.connect(self.delete_session)
 
-        for btn in [btn_new, btn_continue, btn_delete]:
+        btn_toggle_theme = QPushButton("Toggle Light/Dark Mode")
+        btn_toggle_theme.clicked.connect(self.toggle_theme)
+
+        for btn in [btn_new, btn_continue, btn_delete, btn_toggle_theme]:
             btn.setIconSize(btn.sizeHint())
             left_layout.addWidget(btn)
 
-        # Right layout
         right_layout = QVBoxLayout()
-
         self.chat_scroll = QScrollArea()
         self.chat_scroll.setWidgetResizable(True)
         self.chat_container = QVBoxLayout()
@@ -90,12 +136,14 @@ class ChatHome(QWidget):
         input_layout = QHBoxLayout()
         self.entry = QLineEdit()
         self.entry.setPlaceholderText("Type a message...")
+
         btn_send = QPushButton(qta.icon('fa5s.paper-plane'), "")
         btn_send.clicked.connect(self.send_message)
+
         input_layout.addWidget(self.entry)
         input_layout.addWidget(btn_send)
 
-        right_layout.addWidget(QLabel("\U0001F4AC Chat"))
+        right_layout.addWidget(QLabel("Chat"))
         right_layout.addWidget(self.chat_scroll)
         right_layout.addWidget(self.typing_label)
         right_layout.addLayout(input_layout)
@@ -105,49 +153,85 @@ class ChatHome(QWidget):
 
         self.refresh_session_list()
 
+    def toggle_theme(self):
+        self.is_dark_mode = not self.is_dark_mode
+        self.set_styles()
+
     def set_styles(self):
-        self.setStyleSheet("""
-            QWidget {
-                background-color: #0F1C2E;
-                color: #FFFFFF;
-                font-family: Arial;
+        if self.is_dark_mode:
+            self.setStyleSheet("""QWidget {
+                background-color: #1e1e20;
+                color: #f4f4f5;
+                font-family: 'Segoe UI';
                 font-size: 14px;
             }
             QListWidget {
-                background-color: #1F2B3E;
-                border: 1px solid #374357;
-                color: #e0e0e0;
+                background-color: #2a2a2e;
+                border: 1px solid #3a3a3e;
+                color: #e4e4e7;
             }
             QPushButton {
-                background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 #3D5A80, stop:1 #1F2B3E);
-                color: #FFFFFF;
+                background-color: #3f3f46;
+                color: #ffffff;
                 border-radius: 5px;
-                padding: 8px 10px;
+                padding: 6px 10px;
             }
             QPushButton:hover {
-                background-color: #4D648D;
+                background-color: #52525b;
             }
             QLineEdit {
-                background-color: #2B3A50;
-                color: #FFFFFF;
-                border: 1px solid #374357;
-                padding: 6px;
+                background-color: #27272a;
+                color: #f4f4f5;
+                border: 1px solid #3f3f46;
+                padding: 8px;
+                border-radius: 5px;
             }
             QLabel {
                 font-weight: bold;
-                margin-bottom: 5px;
+                margin-bottom: 6px;
+            }""")
+        else:
+            self.setStyleSheet("""QWidget {
+                background-color: #ffffff;
+                color: #000000;
+                font-family: 'Segoe UI';
+                font-size: 14px;
             }
-        """)
+            QListWidget {
+                background-color: #f5f5f5;
+                border: 1px solid #cccccc;
+                color: #000000;
+            }
+            QPushButton {
+                background-color: #e0e0e0;
+                color: #000000;
+                border-radius: 5px;
+                padding: 6px 10px;
+            }
+            QPushButton:hover {
+                background-color: #d0d0d0;
+            }
+            QLineEdit {
+                background-color: #f0f0f0;
+                color: #000000;
+                border: 1px solid #cccccc;
+                padding: 8px;
+                border-radius: 5px;
+            }
+            QLabel {
+                font-weight: bold;
+                margin-bottom: 6px;
+            }""")
 
     def refresh_session_list(self):
         self.session_list.clear()
-        for session in gemini.get_sessions():
-            self.session_list.addItem(session['name'])
+        for session in get_sessions():
+            self.session_list.addItem(session["name"])
 
     def new_session(self):
         name, ok = QInputDialog.getText(self, "New Session", "Enter a name:")
         if ok and name:
-            self.session = gemini.start_session(name)
+            self.session = start_session(name)
             self.clear_chat()
             self.refresh_session_list()
 
@@ -157,7 +241,7 @@ class ChatHome(QWidget):
             QMessageBox.warning(self, "Error", "Select a session first.")
             return
         name = selected.text()
-        session_data = gemini.get_session_by_name(name)
+        session_data = get_session_by_name(name)
         if not session_data:
             QMessageBox.warning(self, "Error", f"Session '{name}' not found.")
             return
@@ -172,7 +256,7 @@ class ChatHome(QWidget):
         name = selected.text()
         confirm = QMessageBox.question(self, "Confirm", f"Delete session '{name}'?")
         if confirm == QMessageBox.StandardButton.Yes:
-            gemini.delete_session_by_name(name)
+            delete_session_by_name(name)
             self.clear_chat()
             self.refresh_session_list()
 
@@ -185,12 +269,10 @@ class ChatHome(QWidget):
 
     def load_messages(self):
         self.clear_chat()
-        
-        messages = self.session.get('messages') or []
+        messages = self.session.get("messages", [])
         for msg in messages:
-
-            self.add_chat_bubble(msg['user_message'], is_user=True)
-            self.add_chat_bubble(msg['bot_response'], is_user=False)
+            self.add_chat_bubble(msg["user_message"], is_user=True)
+            self.add_chat_bubble(msg["bot_response"], is_user=False)
 
     def add_chat_bubble(self, text, is_user):
         bubble = ChatBubble(text, is_user)
@@ -214,20 +296,17 @@ class ChatHome(QWidget):
         user_text = self.entry.text().strip()
         if not user_text:
             return
-
         self.add_chat_bubble(user_text, is_user=True)
         self.entry.clear()
         self.typing_label.show()
-
-        QTimer.singleShot(1000, lambda: self.fake_typing(user_text))
+        QTimer.singleShot(500, lambda: self.fake_typing(user_text))
 
     def fake_typing(self, user_text):
-        response = gemini.send_to_session(self.session, user_text)
+        response = route_all_apis(self.session, user_text)
         self.typing_label.hide()
         self.add_chat_bubble(response, is_user=False)
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = ChatHome()
     window.show()
