@@ -98,8 +98,7 @@ def route_weather_query(query: str):
         r"(raining|rain|sunny|cloudy|snow|snowing|windy).* in ([a-zA-Z\s]+)",
         r"in ([a-zA-Z\s]+).*(weather|forecast|like)",
         r"(current weather|today'?s weather|weather report).* ([a-zA-Z\s]+)",
-        r"(how's it|what's it like) in ([a-zA-Z\s]+)",
-        r"([a-zA-Z\s]+)\?*$"  
+        r"(how's it|what's it like) in ([a-zA-Z\s]+)",  
     ]
 
     for pattern in patterns:

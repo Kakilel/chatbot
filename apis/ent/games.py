@@ -74,13 +74,43 @@ def route_game_query(query: str):
     return search_game(query)
 
 def format_game_response(data):
-    if not data or "name" not in data:
+    if not data:
         return "No game info found."
+
+    if isinstance(data, dict) and "results" in data:
+        results = data["results"]
+        if not isinstance(results, list) or not results:
+            return "No matching games found."
+
+        output = ""
+        for game in results[:5]:
+            name = game.get("name", "Unknown Title")
+            released = game.get("released", "Unknown")
+            rating = game.get("rating", "N/A")
+            output += f"🎮 **{name}** (Released: {released}, {rating})\n"
+        return output.strip()
+
+    if "results" in data and all("image" in item for item in data["results"]):
+        images = [item["image"] for item in data["results"][:5]]
+        return " Screenshots:\n" + "\n".join(images)
+
+    if "results" in data and all("data" in item and "480" in item["data"] for item in data["results"]):
+        trailers = [item["data"]["480"] for item in data["results"][:3]]
+        return "🎬 Trailers:\n" + "\n".join(trailers)
 
     name = data.get("name", "Unknown Title")
     description = data.get("description_raw", "No description available.")
     website = data.get("website", "")
     released = data.get("released", "Unknown")
+    rating = data.get("rating", "N/A")
+    genres = ", ".join(g["name"] for g in data.get("genres", []))
+    platforms = ", ".join(p["platform"]["name"] for p in data.get("platforms", []))
 
-    return f"**{name}** (Released: {released})\n\n{description}\n\n{website if website else ''}"
-
+    return (
+        f"**{name}**\n"
+        f"Released: {released} |Rating: {rating}\n"
+        f"Platforms: {platforms}\n"
+        f"Genres: {genres}\n\n"
+        f"{description[:500]}...\n"
+        f"{website if website else ''}"
+    )

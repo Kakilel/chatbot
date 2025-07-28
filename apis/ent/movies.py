@@ -22,11 +22,11 @@ def make_request(endpoint: str, params: dict = {}):
         logging.error(f"Request exception: {e}")
     return None
 
-
 def route_movie_query(query: str):
     if not query:
         return None
 
+    print("[MOVIE DEBUG] User input →", query) 
     query = query.lower()
 
     if any(phrase in query for phrase in ["trending", "what's hot", "what's popular now"]):
@@ -92,16 +92,29 @@ def route_movie_query(query: str):
         if movie and movie.get("results"):
             return movie_external_ids(movie["results"][0]["id"])
 
-    return search_multi(query)
+    if match := re.search(r"(about|on|is)\s+(.*)", query):
+        fallback_query = match.group(2)
+        movie = search_movie(fallback_query)
+        if movie and movie.get("results"):
+            return movie
 
+    movie = search_movie(query)
+    if movie and movie.get("results"):
+        return movie
 
-
-
+    return {"results": []}
 
 def search_movie(query: str):
     if not query:
         return None
-    return make_request("/search/movie", {"query": query})
+    response = make_request("/search/movie", {"query": query})
+    results = response.get("results", [])
+    
+    for result in results:
+        if result.get("title", "").lower() == query.lower():
+            return {"results": [result]}
+
+    return response
 
 def search_tv(query: str):
     if not query:
@@ -120,8 +133,6 @@ def search_multi(query: str):
 
 
 def trending_movies(period: str = "week"):
-    if period not in ["day", "week"]:
-        period = "week"
     return make_request(f"/trending/movie/{period}")
 
 def popular_movies():
@@ -145,130 +156,61 @@ def top_rated_tv():
 def airing_today():
     return make_request("/tv/airing_today")
 
-
 def movie_details(movie_id: int):
-    if not movie_id:
-        return None
     return make_request(f"/movie/{movie_id}")
 
-def tv_details(tv_id: int):
-    if not tv_id:
-        return None
-    return make_request(f"/tv/{tv_id}")
-
 def movie_credits(movie_id: int):
-    if not movie_id:
-        return None
     return make_request(f"/movie/{movie_id}/credits")
 
-def tv_credits(tv_id: int):
-    if not tv_id:
-        return None
-    return make_request(f"/tv/{tv_id}/credits")
-
 def movie_recommendations(movie_id: int):
-    if not movie_id:
-        return None
     return make_request(f"/movie/{movie_id}/recommendations")
 
-def movie_similar(movie_id: int):
-    if not movie_id:
-        return None
-    return make_request(f"/movie/{movie_id}/similar")
-
-def movie_keywords(movie_id: int):
-    if not movie_id:
-        return None
-    return make_request(f"/movie/{movie_id}/keywords")
-
 def movie_reviews(movie_id: int):
-    if not movie_id:
-        return None
     return make_request(f"/movie/{movie_id}/reviews")
 
 def movie_external_ids(movie_id: int):
-    if not movie_id:
-        return None
     return make_request(f"/movie/{movie_id}/external_ids")
 
-
-def person_details(person_id: int):
-    if not person_id:
-        return None
-    return make_request(f"/person/{person_id}")
-
-def person_movie_credits(person_id: int):
-    if not person_id:
-        return None
-    return make_request(f"/person/{person_id}/movie_credits")
-
-def person_tv_credits(person_id: int):
-    if not person_id:
-        return None
-    return make_request(f"/person/{person_id}/tv_credits")
-
-def popular_people():
-    return make_request("/person/popular")
-
-
-def genre_movie_list():
-    return make_request("/genre/movie/list")
-
-def genre_tv_list():
-    return make_request("/genre/tv/list")
-
-def discover_movies(filters: dict = {}):
-    return make_request("/discover/movie", filters)
-
-def discover_tv(filters: dict = {}):
-    return make_request("/discover/tv", filters)
-
-
-def watch_providers():
-    return make_request("/watch/providers/movie")
-
 def movie_watch_providers(movie_id: int):
-    if not movie_id:
-        return None
     return make_request(f"/movie/{movie_id}/watch/providers")
 
-def tv_watch_providers(tv_id: int):
-    if not tv_id:
-        return None
-    return make_request(f"/tv/{tv_id}/watch/providers")
-
-
 def movie_images(movie_id: int):
-    if not movie_id:
-        return None
     return make_request(f"/movie/{movie_id}/images")
 
 def movie_videos(movie_id: int):
-    if not movie_id:
-        return None
     return make_request(f"/movie/{movie_id}/videos")
 
-def tv_images(tv_id: int):
-    if not tv_id:
-        return None
-    return make_request(f"/tv/{tv_id}/images")
+def person_details(person_id: int):
+    return make_request(f"/person/{person_id}")
 
-def tv_videos(tv_id: int):
-    if not tv_id:
-        return None
-    return make_request(f"/tv/{tv_id}/videos")
-
-
-
-def tmdb_configuration():
-    return make_request("/configuration")
-
+def person_movie_credits(person_id: int):
+    return make_request(f"/person/{person_id}/movie_credits")
 
 def format_movie_response(data):
     if not data:
         return "No movie information found."
 
-    if 'results' in data:
+    if "results" in data and isinstance(data["results"], dict):
+        country = "KE"  
+        country_data = data["results"].get(country)
+        if not country_data:
+            return f"No streaming information available for {country}."
+        
+        lines = [f"🎬 Available in {country.upper()}:\n"]
+        if link := country_data.get("link"):
+            lines.append(f"🔗 More info: {link}")
+        for method in ["flatrate", "buy", "rent"]:
+            if method in country_data:
+                platform_list = [provider["provider_name"] for provider in country_data[method]]
+                method_name = {
+                    "flatrate": "Streaming",
+                    "buy": "Buy",
+                    "rent": "Rent"
+                }[method]
+                lines.append(f"📺 {method_name}: {', '.join(platform_list)}")
+        return "\n".join(lines)
+
+    if 'results' in data and isinstance(data['results'], list):
         results = data['results']
         if not results:
             return "No results found."
@@ -287,3 +229,17 @@ def format_movie_response(data):
         return f"🎬 {title} ({release})\n{overview}"
 
     return str(data)
+
+
+
+if __name__ == "__main__":
+    print("=== Testing Movies API ===")
+    test_queries = [
+
+        "Where can I watch Avatar?",
+        "Give me the trailer of Oppenheimer",
+    ]
+    for q in test_queries:
+        print(f"\n--- Test: {q}")
+        result = route_movie_query(q)
+        print(format_movie_response(result))
